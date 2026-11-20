@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import useRecordRoute from '../../../navigation/useRecordRoute';
+import { MESSAGES, savedRecordOf, useNotify } from '../../../context/NotificationContext';
 import {
   Box,
   Card,
@@ -342,7 +344,31 @@ function SalesTeamKanbanView({ data, loading, error, onCardClick, onCreateClick,
           mb: 1.5,
         }}
       >
-        <Box>
+        {/* Left: New button first, same position and style as the standard List View */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => onCreateClick && onCreateClick()}
+            sx={{
+              minWidth: 50,
+              height: 28,
+              px: 1.4,
+              py: 0,
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: '#262755',
+              borderColor: '#CBD5E1',
+              bgcolor: '#FFFFFF',
+              textTransform: 'none',
+              borderRadius: '4px',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+              '&:hover': { bgcolor: '#F8FAFC', borderColor: '#94A3B8' },
+            }}
+          >
+            New
+          </Button>
+          <Box>
           {breadcrumbs?.length > 0 && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
               {breadcrumbs.map((b, i) => (
@@ -367,6 +393,7 @@ function SalesTeamKanbanView({ data, loading, error, onCardClick, onCreateClick,
           <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F172A' }}>
             Sales Teams
           </Typography>
+          </Box>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -387,24 +414,6 @@ function SalesTeamKanbanView({ data, loading, error, onCardClick, onCreateClick,
             }}
           />
           {viewSwitchControl}
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<AddIcon sx={{ fontSize: '0.875rem' }} />}
-            onClick={() => onCreateClick && onCreateClick()}
-            sx={{
-              bgcolor: '#262755',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              textTransform: 'none',
-              px: 1.5,
-              py: 0.5,
-              boxShadow: 'none',
-              '&:hover': { bgcolor: '#1B1C3D', boxShadow: 'none' },
-            }}
-          >
-            New Team
-          </Button>
         </Box>
       </Box>
 
@@ -485,6 +494,7 @@ export default function SalesTeam({ parentBreadcrumb = 'CRM' }) {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const notify = useNotify();
   const [snackbar, setSnackbar] = useState(null);
 
   // ── Load all users once ──────────────────────────────────────────────────
@@ -558,16 +568,19 @@ export default function SalesTeam({ parentBreadcrumb = 'CRM' }) {
       team_member_id: formData.team_member_id ? Number(formData.team_member_id) : null,
     };
 
+    let savedRecord = null;
     try {
       if (isExisting) {
-        await salesTeamService.update(selectedRecord.id, payload);
-        setSnackbar('Sales team updated successfully.');
+        savedRecord = await salesTeamService.update(selectedRecord.id, payload);
       } else {
-        await salesTeamService.create(payload);
-        setSnackbar('Sales team created successfully.');
+        savedRecord = await salesTeamService.create(payload);
       }
       await loadData();
-      handleBackToList();
+      notify.success(isExisting ? MESSAGES.updated : MESSAGES.created);
+      // Stay on the form: a created record continues as an existing one (its id goes into the URL).
+      const nextRecord = savedRecordOf(savedRecord, payload, selectedRecord);
+      if (nextRecord) setSelectedRecord(nextRecord);
+      else handleBackToList();
     } catch (err) {
       console.error('SalesTeam save error:', err);
       setFormError(err.message || 'Failed to save sales team.');
@@ -581,8 +594,8 @@ export default function SalesTeam({ parentBreadcrumb = 'CRM' }) {
     if (!window.confirm('Delete this sales team?')) return;
     try {
       await salesTeamService.delete(id);
+      notify.success(MESSAGES.deleted);
       setData((prev) => prev.filter((r) => r.id !== id));
-      setSnackbar('Sales team deleted.');
     } catch (err) {
       console.error('SalesTeam delete error:', err);
       setListError(err.message || 'Failed to delete sales team.');
@@ -590,6 +603,9 @@ export default function SalesTeam({ parentBreadcrumb = 'CRM' }) {
   };
 
   // ── Breadcrumbs ─────────────────────────────────────────────────────────
+  // URL <-> screen sync: refresh, deep links and Back/Forward reopen the same record.
+  useRecordRoute({ viewMode, selectedRecord, data, loading, onOpen: handleOpenForm, onClose: handleBackToList });
+
   const breadcrumbs = [
     { label: parentBreadcrumb },
     { label: 'Settings' },

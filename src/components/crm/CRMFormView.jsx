@@ -17,6 +17,8 @@ import {
   StarBorder as StarBorderIcon,
 } from '@mui/icons-material';
 import FormViewToolbar from '../common/FormViewToolbar';
+import Chatter from '../common/Chatter';
+import useUnsavedWarning from '../../navigation/useUnsavedWarning';
 import StatusProgression from './StatusProgression';
 import { contactService } from '../../services/resources/contactService';
 import { crmService } from '../../services/resources/crmService';
@@ -90,6 +92,7 @@ export default function CRMFormView({
   const activeCurrencySymbol = activeCurrency?.symbol || activeCurrency?.name || '';
 
   const [isDirty, setIsDirty] = useState(false);
+  useUnsavedWarning(isDirty);
   const initialValuesRef = useRef({});
 
   // Current stage state
@@ -952,6 +955,8 @@ export default function CRMFormView({
         </Grid>
         </Box>
       </Card>
+
+      <Chatter model="crm_lead" recordId={isEditMode ? initialData.id : null} refreshKey={initialData} />
 
       {/* Snackbar feedback for stage change */}
       <Snackbar

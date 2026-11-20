@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import useRecordRoute from '../../navigation/useRecordRoute';
+import { MESSAGES, savedRecordOf, useNotify } from '../../context/NotificationContext';
 import { DynamicListView, DynamicKanbanView, ViewSwitcher } from '../common';
 import SaleOrderFormView from './SaleOrderFormView';
 import { saleOrderService } from '../../services/resources/saleOrderService';
@@ -19,6 +21,7 @@ export const saleOrderConfig = {
   subtitle: 'Manage and track customer sales orders, quotation statuses, order lines, and fulfillment',
   primaryKey: 'id',
   createButtonText: 'New Sale Order',
+  registryModel: 'sales_order',
   columns: [
     { field: 'id', headerName: 'Order ID', width: 110, sortable: true },
     { field: 'name', headerName: 'Order Number', width: 150, sortable: true },
@@ -61,6 +64,7 @@ export default function SaleOrder() {
 
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'kanban' | 'form'
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const notify = useNotify();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -143,20 +147,23 @@ export default function SaleOrder() {
     const pKey = saleOrderConfig.primaryKey;
     const isExisting = Boolean(selectedRecord && selectedRecord[pKey]);
 
-    if (isExisting) {
-      await saleOrderService.update(selectedRecord[pKey], orderPayload);
-    } else {
-      await saleOrderService.create(orderPayload);
-    }
+    const savedRecord = isExisting
+      ? await saleOrderService.update(selectedRecord[pKey], orderPayload)
+      : await saleOrderService.create(orderPayload);
 
     await loadData();
-    handleBackToList();
+    notify.success(isExisting ? MESSAGES.updated : MESSAGES.created);
+    // Stay on the form: a created order continues as an existing one (its id goes into the URL).
+    const nextRecord = savedRecordOf(savedRecord, orderPayload, selectedRecord, pKey);
+    if (nextRecord) setSelectedRecord(nextRecord);
+    else handleBackToList();
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this sales order?')) return;
     try {
       await saleOrderService.delete(id);
+      notify.success(MESSAGES.deleted);
       setData((prev) => prev.filter((item) => item[saleOrderConfig.primaryKey] !== id));
     } catch (err) {
       console.error('Failed to delete sales order:', err);
@@ -211,6 +218,9 @@ export default function SaleOrder() {
       throw err;
     }
   };
+
+  // URL <-> screen sync: refresh, deep links and Back/Forward reopen the same order.
+  useRecordRoute({ viewMode, selectedRecord, data, loading, onOpen: handleOpenForm, onClose: handleBackToList });
 
   const breadcrumbs = [
     { label: 'Sale Order', onClick: viewMode === 'form' ? handleBackToList : undefined },

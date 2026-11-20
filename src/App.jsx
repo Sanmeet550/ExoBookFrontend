@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import MainLayout from './layouts/MainLayout';
 import SaleOrder from './components/sales/SaleOrder';
 import CRMModule from './components/crm/CRMModule';
+import HelpdeskModule from './components/helpdesk/HelpdeskModule';
 import Company from './components/master/Company/Company';
 import Contacts from './components/master/Contacts/Contacts';
 import Currencies from './components/master/Currencies/Currencies';
@@ -15,19 +16,30 @@ import Department from './components/master/Department/Department';
 import JobPosition from './components/master/JobPosition/JobPosition';
 import Employee from './components/master/Employee/Employee';
 import Users from './components/master/Users/Users';
-import { Card, Typography, Button } from '@mui/material';
+import FieldTracking from './components/master/FieldTracking/FieldTracking';
+import ModelRegistry from './components/master/ModelRegistry/ModelRegistry';
+import { Card, Typography, Button, CssBaseline, ThemeProvider } from '@mui/material';
+import { theme } from './theme';
+import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
+import AuthGate from './components/auth/AuthGate';
 import { ConstructionOutlined } from '@mui/icons-material';
+import { navigate, RouteBaseContext, toPath, useRoute } from './navigation/router';
+import { resolveRoute, tabPath } from './navigation/appRoutes';
 
-export default function App() {
-  const [activeView, setActiveView] = useState({
-    menuId: 'sale-order',
-    moduleKey: 'salesOrders',
-    title: 'Sale Order',
-  });
+function ErpApp() {
+  // The URL decides which screen is shown, so refresh, deep links and Back/Forward all work.
+  const route = useRoute();
+  const activeView = resolveRoute(route);
+  const basePath = toPath(activeView.base);
+  // Helpdesk supplies its own top navigation (it depends on the user's Helpdesk role).
+  const [helpdeskNav, setHelpdeskNav] = useState(null);
 
-  const handleNavigate = (moduleKey, title, menuId) => {
-    setActiveView({ menuId, moduleKey, title });
-  };
+  // Empty or unknown URL: settle on the resolved screen's URL (without adding a history entry).
+  useEffect(() => {
+    if (!activeView.matched) navigate(activeView.base, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView.matched, basePath]);
 
   const renderContent = () => {
     switch (activeView.moduleKey) {
@@ -36,7 +48,18 @@ export default function App() {
 
       // CRM module — single entry point with top nav for Lead / Opportunity / Settings
       case 'crm':
-        return <CRMModule key="crm-module-view" />;
+        return <CRMModule key="crm-module-view" crmActiveTab={activeView.tab} />;
+
+      // Helpdesk module — single entry point with top nav (tabs depend on the user's Helpdesk role)
+      case 'helpdesk':
+        return (
+          <HelpdeskModule
+            key="helpdesk-module-view"
+            activeTab={activeView.tab}
+            onTabChange={(tab) => navigate(tabPath('helpdesk', tab))}
+            onRegisterNav={setHelpdeskNav}
+          />
+        );
 
       case 'company':
         return <Company key="company-view" />;
@@ -64,6 +87,10 @@ export default function App() {
         return <Employee key="employee-view" />;
       case 'users':
         return <Users key="users-view" />;
+      case 'fieldTracking':
+        return <FieldTracking key="fieldTracking-view" />;
+      case 'modelRegistry':
+        return <ModelRegistry key="modelRegistry-view" />;
 
       default:
         return (
@@ -73,13 +100,10 @@ export default function App() {
               {activeView.title}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 450, mx: 'auto', mb: 2 }}>
-              Select Sale Order or any Master submenu item from the sidebar.
+              Select a module from the sidebar.
             </Typography>
-            <Button
-              variant="outlined"
-              onClick={() => handleNavigate('salesOrders', 'Sale Order', 'sale-order')}
-            >
-              Go to Sale Order
+            <Button variant="outlined" onClick={() => navigate([])}>
+              Go to the start page
             </Button>
           </Card>
         );
@@ -87,12 +111,25 @@ export default function App() {
   };
 
   return (
-    <MainLayout
-      activeView={activeView}
-      setActiveView={setActiveView}
-      onNavigateModule={(moduleKey, title, menuLabel, menuId) => handleNavigate(moduleKey, title, menuId)}
-    >
-      {renderContent()}
+    <MainLayout activeView={activeView} moduleTopNav={activeView.moduleKey === 'helpdesk' ? helpdeskNav : null}>
+      {/* Screens read and write their record id relative to this base path */}
+      <RouteBaseContext.Provider value={activeView.base}>{renderContent()}</RouteBaseContext.Provider>
     </MainLayout>
+  );
+}
+
+/** Theme, notifications and sign-in wrap the whole app; ERP screens load only after sign-in. */
+export default function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <NotificationProvider>
+        <AuthProvider>
+          <AuthGate>
+            <ErpApp />
+          </AuthGate>
+        </AuthProvider>
+      </NotificationProvider>
+    </ThemeProvider>
   );
 }

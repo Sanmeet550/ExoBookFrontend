@@ -492,7 +492,6 @@ export const MODEL_METADATA = {
     fields: [
       { name: 'name', label: 'User Full Name', type: 'text', required: true, cols: 2 },
       { name: 'login', label: 'Login Username / Identifier', type: 'text', required: true, cols: 2 },
-      { name: 'password', label: 'Password (leave blank to keep unchanged)', type: 'text', cols: 1 },
     ],
   },
 

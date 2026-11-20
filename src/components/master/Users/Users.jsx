@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import useRecordRoute from '../../../navigation/useRecordRoute';
+import { MESSAGES, savedRecordOf, useNotify } from '../../../context/NotificationContext';
 import { DynamicListView, DynamicFormView } from '../../common';
 import { usersService } from '../../../services/resources/usersService';
 import { MODEL_METADATA } from '../../../config/modelMetadata';
+import { Button } from '@mui/material';
+import { LockResetOutlined } from '@mui/icons-material';
+import SetPasswordDialog from './SetPasswordDialog';
 
 /**
  * Users Master Component
@@ -32,6 +37,8 @@ export default function Users() {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const notify = useNotify();
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -72,23 +79,25 @@ export default function Users() {
     const pKey = usersConfig.primaryKey;
     const isExisting = Boolean(selectedRecord && selectedRecord[pKey]);
 
+    // The password is not part of the form: it is set with the "Set Password" button.
     const payload = {
       name: formData.name?.trim(),
       login: formData.login?.trim(),
     };
 
-    if (formData.password && formData.password.trim()) {
-      payload.password = formData.password.trim();
-    }
-
+    let savedRecord = null;
     try {
       if (isExisting) {
-        await usersService.update(selectedRecord[pKey], payload);
+        savedRecord = await usersService.update(selectedRecord[pKey], payload);
       } else {
-        await usersService.create(payload);
+        savedRecord = await usersService.create(payload);
       }
       await loadData();
-      handleBackToList();
+      notify.success(isExisting ? MESSAGES.updated : MESSAGES.created);
+      // Stay on the form: a created record continues as an existing one (its id goes into the URL).
+      const nextRecord = savedRecordOf(savedRecord, payload, selectedRecord);
+      if (nextRecord) setSelectedRecord(nextRecord);
+      else handleBackToList();
     } catch (err) {
       setFormError(err.message || 'Failed to save user.');
       if (err.fieldErrors) {
@@ -103,11 +112,15 @@ export default function Users() {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
       await usersService.delete(id);
+      notify.success(MESSAGES.deleted);
       setData((prev) => prev.filter((item) => item[usersConfig.primaryKey] !== id));
     } catch (err) {
       setListError(err.message || 'Failed to delete user.');
     }
   };
+
+  // URL <-> screen sync: refresh, deep links and Back/Forward reopen the same record.
+  useRecordRoute({ viewMode, selectedRecord, data, loading, onOpen: handleOpenForm, onClose: handleBackToList });
 
   const breadcrumbs = [
     { label: 'Master' },
@@ -120,8 +133,23 @@ export default function Users() {
   }
 
   if (viewMode === 'form') {
+    const isExistingUser = Boolean(selectedRecord?.[usersConfig.primaryKey]);
     return (
+      <>
       <DynamicFormView
+        statusBarSlot={
+          isExistingUser ? (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<LockResetOutlined sx={{ fontSize: 15 }} />}
+              onClick={() => setPasswordDialogOpen(true)}
+              sx={{ height: 28, fontSize: '0.6875rem', textTransform: 'none', color: '#262755', borderColor: '#CBD5E1' }}
+            >
+              Set Password
+            </Button>
+          ) : null
+        }
         config={usersConfig}
         initialData={selectedRecord}
         records={data}
@@ -134,6 +162,10 @@ export default function Users() {
         onBack={handleBackToList}
         breadcrumbs={breadcrumbs}
       />
+      {isExistingUser && (
+        <SetPasswordDialog user={selectedRecord} open={passwordDialogOpen} onClose={() => setPasswordDialogOpen(false)} />
+      )}
+      </>
     );
   }
 

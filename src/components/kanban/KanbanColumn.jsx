@@ -28,6 +28,8 @@ export default function KanbanColumn({
   onCardClick,
   onAddClick,
   onDropCard,
+  onCardDragStart,
+  onCardDragEnd,
   draggedCard,
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -194,7 +196,9 @@ export default function KanbanColumn({
               config={config}
               primaryKey={primaryKey}
               onClick={onCardClick}
-              isDragging={draggedCard && draggedCard[primaryKey] === rec[primaryKey]}
+              onDragStart={onCardDragStart}
+              onDragEnd={onCardDragEnd}
+              isDragging={Boolean(draggedCard && draggedCard[primaryKey] === rec[primaryKey])}
             />
           ))
         ) : (

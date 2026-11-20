@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
   Box,
-  TextField,
-  InputAdornment,
   Button,
   Typography,
   CircularProgress,
@@ -13,10 +11,10 @@ import {
   TablePagination,
 } from '@mui/material';
 import {
-  Search as SearchIcon,
-  Add as AddIcon,
 } from '@mui/icons-material';
 import AppBreadcrumbs from '../AppBreadcrumbs';
+import SearchFacets from '../common/SearchFacets';
+import useFacetSearch from '../common/useFacetSearch';
 import KanbanColumn from './KanbanColumn';
 import KanbanCard from './KanbanCard';
 
@@ -64,8 +62,6 @@ export default function DynamicKanbanView({
 
   const [activeGroupField, setActiveGroupField] = useState(defaultGrouping || '');
 
-  // Search filter
-  const [searchTerm, setSearchTerm] = useState('');
 
   // Pagination for ungrouped grid mode
   const [page, setPage] = useState(0);
@@ -112,28 +108,8 @@ export default function DynamicKanbanView({
     }));
   }, [isGrouped, activeGroup, data, activeGroupField]);
 
-  // Filter data by search term across all configured or visible card fields
-  const filteredData = useMemo(() => {
-    if (!searchTerm.trim()) return data;
-    const term = searchTerm.toLowerCase();
-
-    const searchFields = kanbanConfig.searchFields || [
-      kanbanConfig.kanbanCard?.titleField || 'name',
-      kanbanConfig.kanbanCard?.subtitleField || 'customer_name',
-      'code',
-      'email',
-      'phone',
-      primaryKey,
-    ];
-
-    return data.filter((row) =>
-      searchFields.some((field) => {
-        const val = row[field];
-        if (val === null || val === undefined) return false;
-        return String(val).toLowerCase().includes(term);
-      })
-    );
-  }, [data, searchTerm, kanbanConfig, primaryKey]);
+  // Odoo-style field search, shared with the List view of the same screen.
+  const { filteredData, searchProps } = useFacetSearch({ config: config || {}, data, onFacetsChange: () => setPage(0) });
 
   // Group filtered records by column (for grouped mode)
   const groupedRecords = useMemo(() => {
@@ -214,7 +190,7 @@ export default function DynamicKanbanView({
 
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
-      {/* Top Bar: Title & Breadcrumbs on Left, Central Search, Controls on Right */}
+      {/* Top Bar: New + Title & Breadcrumbs on Left, Central Search, Controls on Right */}
       <Box
         sx={{
           display: 'flex',
@@ -225,12 +201,40 @@ export default function DynamicKanbanView({
           flexWrap: { xs: 'wrap', md: 'nowrap' },
         }}
       >
-        {/* Left: Page Title + Breadcrumbs */}
-        <Box sx={{ minWidth: 160 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.95rem', lineHeight: 1.2 }}>
-            {title}
-          </Typography>
-          <AppBreadcrumbs items={breadcrumbs} />
+        {/* Left: New button + Page Title + Breadcrumbs (same position and style as the List View) */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 160, flexShrink: 0 }}>
+          {onCreateClick && (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => onCreateClick()}
+              disabled={loading}
+              sx={{
+                minWidth: 50,
+                height: 28,
+                px: 1.4,
+                py: 0,
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: '#262755',
+                borderColor: '#CBD5E1',
+                bgcolor: '#FFFFFF',
+                textTransform: 'none',
+                borderRadius: '4px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                flexShrink: 0,
+                '&:hover': { bgcolor: '#F8FAFC', borderColor: '#94A3B8' },
+              }}
+            >
+              {createButtonText === 'New Record' ? 'New' : createButtonText}
+            </Button>
+          )}
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h5" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.95rem', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+              {title}
+            </Typography>
+            <AppBreadcrumbs items={breadcrumbs} />
+          </Box>
         </Box>
 
         {/* Center: Search Input Bar */}
@@ -244,31 +248,7 @@ export default function DynamicKanbanView({
             width: { xs: '100%', md: 'auto' },
           }}
         >
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="Search records in kanban..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setPage(0);
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon sx={{ color: '#94A3B8', fontSize: 16 }} />
-                </InputAdornment>
-              ),
-              sx: {
-                bgcolor: '#FFFFFF',
-                borderRadius: '6px',
-                height: 30,
-                fontSize: '0.6875rem',
-                border: '1px solid #E2E8F0',
-                '& fieldset': { border: 'none' },
-              },
-            }}
-          />
+          <SearchFacets {...searchProps} placeholder="Search..." />
         </Box>
 
         {/* Right: Actions, Group By Selector, and View Switcher */}
@@ -298,26 +278,6 @@ export default function DynamicKanbanView({
 
           {/* View Switch Buttons (List / Kanban) */}
           {viewSwitchControl}
-
-          {/* New Record Button */}
-          {onCreateClick && (
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={<AddIcon sx={{ fontSize: '0.85rem' }} />}
-              onClick={() => onCreateClick()}
-              sx={{
-                backgroundColor: '#262755',
-                color: '#FFFFFF',
-                height: 28,
-                fontSize: '0.6875rem',
-                px: 1.4,
-                '&:hover': { backgroundColor: '#1B1C3D' },
-              }}
-            >
-              {createButtonText}
-            </Button>
-          )}
         </Box>
       </Box>
 
@@ -360,6 +320,8 @@ export default function DynamicKanbanView({
               onCardClick={onCardClick}
               onAddClick={onCreateClick ? (stageVal) => onCreateClick({ [activeGroupField]: stageVal }) : null}
               onDropCard={handleDropCard}
+              onCardDragStart={onRecordMove ? handleDragStart : undefined}
+              onCardDragEnd={handleDragEnd}
               draggedCard={draggedCard}
             />
           ))}

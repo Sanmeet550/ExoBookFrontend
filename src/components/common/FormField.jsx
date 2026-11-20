@@ -39,7 +39,7 @@ export default function FormField({
 
   useEffect(() => {
     let isMounted = true;
-    if (type === 'many2one' && relation?.endpoint) {
+    if ((type === 'many2one' || type === 'many2many') && relation?.endpoint) {
       setLoadingRelation(true);
       relationCacheService
         .getRelationRecords(relation.endpoint)
@@ -76,7 +76,7 @@ export default function FormField({
   }, [relationRecords, depends_on, parentValue]);
 
   const dropdownOptions = useMemo(() => {
-    if (type === 'many2one') {
+    if (type === 'many2one' || type === 'many2many') {
       const valField = relation?.value_field || 'id';
       const lblField = relation?.label_field || 'name';
       return filteredRelationRecords.map((rec) => ({
@@ -132,6 +132,38 @@ export default function FormField({
         <MenuItem value="" sx={{ fontSize: '0.6875rem' }}>
           <em>-- Select {label} --</em>
         </MenuItem>
+        {dropdownOptions.map((opt) => (
+          <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: '0.6875rem' }}>
+            {opt.label}
+          </MenuItem>
+        ))}
+      </TextField>
+    );
+  }
+
+  // 1b. Relational Many2Many multi-select (value is an array of ids)
+  if (type === 'many2many') {
+    const selected = Array.isArray(value) ? value : [];
+    const labelOf = (id) => dropdownOptions.find((opt) => opt.value === id)?.label || `ID ${id}`;
+    return (
+      <TextField
+        select
+        fullWidth
+        size="small"
+        label={label}
+        value={selected}
+        onChange={(e) => onChange(name, e.target.value)}
+        required={required}
+        disabled={disabled}
+        error={error}
+        helperText={loadingRelation ? 'Loading...' : helperText}
+        SelectProps={{
+          multiple: true,
+          renderValue: (ids) => ids.map(labelOf).join(', '),
+        }}
+        InputProps={{ sx: { fontSize: '0.6875rem' } }}
+        InputLabelProps={{ sx: { fontSize: '0.6875rem' } }}
+      >
         {dropdownOptions.map((opt) => (
           <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: '0.6875rem' }}>
             {opt.label}

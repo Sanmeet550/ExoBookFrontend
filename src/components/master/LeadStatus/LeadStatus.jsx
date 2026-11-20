@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import useRecordRoute from '../../../navigation/useRecordRoute';
+import { MESSAGES, savedRecordOf, useNotify } from '../../../context/NotificationContext';
 import { DynamicListView, DynamicFormView } from '../../common';
 import { leadStatusService } from '../../../services/resources/leadStatusService';
 import { opportunityStatusService } from '../../../services/resources/opportunityStatusService';
@@ -62,6 +64,7 @@ export default function LeadStatus({ parentBreadcrumb = 'Master', statusType = '
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const notify = useNotify();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -113,14 +116,19 @@ export default function LeadStatus({ parentBreadcrumb = 'Master', statusType = '
       is_won: Boolean(formData.is_won),
     };
 
+    let savedRecord = null;
     try {
       if (isExisting) {
-        await service.update(selectedRecord[pKey], payload);
+        savedRecord = await service.update(selectedRecord[pKey], payload);
       } else {
-        await service.create(payload);
+        savedRecord = await service.create(payload);
       }
       await loadData();
-      handleBackToList();
+      notify.success(isExisting ? MESSAGES.updated : MESSAGES.created);
+      // Stay on the form: a created record continues as an existing one (its id goes into the URL).
+      const nextRecord = savedRecordOf(savedRecord, payload, selectedRecord);
+      if (nextRecord) setSelectedRecord(nextRecord);
+      else handleBackToList();
     } catch (err) {
       console.error(`${statusLabel} save error:`, err);
       setFormError(err.message || `Failed to save ${statusLabel.toLowerCase()} record.`);
@@ -136,6 +144,7 @@ export default function LeadStatus({ parentBreadcrumb = 'Master', statusType = '
     if (!window.confirm('Are you sure you want to delete this stage?')) return;
     try {
       await service.delete(id);
+      notify.success(MESSAGES.deleted);
       setData((prev) => prev.filter((item) => item[config.primaryKey] !== id));
     } catch (err) {
       console.error('Failed to delete stage:', err);
@@ -186,6 +195,9 @@ export default function LeadStatus({ parentBreadcrumb = 'Master', statusType = '
       setData(previousData);
     }
   };
+
+  // URL <-> screen sync: refresh, deep links and Back/Forward reopen the same record.
+  useRecordRoute({ viewMode, selectedRecord, data, loading, onOpen: handleOpenForm, onClose: handleBackToList });
 
   const breadcrumbs = [
     { label: parentBreadcrumb },

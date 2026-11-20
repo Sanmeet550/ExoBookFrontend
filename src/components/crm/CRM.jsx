@@ -8,6 +8,8 @@ import { opportunityStatusService } from '../../services/resources/opportunitySt
 import { currencyService } from '../../services/resources/currencyService';
 import { useCompany } from '../../context/CompanyContext';
 import { MODEL_METADATA } from '../../config/modelMetadata';
+import useRecordRoute from '../../navigation/useRecordRoute';
+import { MESSAGES, useNotify } from '../../context/NotificationContext';
 
 /**
  * CRM Lead / Opportunity Module Configuration
@@ -62,6 +64,7 @@ export default function CRM({ recordType = 'lead' }) {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const notify = useNotify();
 
   const isOpportunity = recordType === 'opportunity';
   const statusService = isOpportunity ? opportunityStatusService : leadStatusService;
@@ -348,6 +351,7 @@ export default function CRM({ recordType = 'lead' }) {
         savedRecord = await crmService.create(payload);
       }
       await loadData();
+      notify.success(isExisting ? MESSAGES.updated : MESSAGES.created);
       // Stay on form view: update selectedRecord with saved data instead of navigating away
       if (isExisting) {
         setSelectedRecord((prev) => ({ ...prev, ...payload }));
@@ -375,6 +379,7 @@ export default function CRM({ recordType = 'lead' }) {
     if (!options?.skipConfirm && !window.confirm('Are you sure you want to delete this CRM lead?')) return;
     try {
       await crmService.delete(id);
+      notify.success(MESSAGES.deleted);
       setData((prev) => prev.filter((item) => item[baseCrmConfig.primaryKey] !== id));
     } catch (err) {
       console.error('Failed to delete CRM lead:', err);
@@ -422,6 +427,9 @@ export default function CRM({ recordType = 'lead' }) {
       throw err;
     }
   };
+
+  // URL <-> screen sync: refresh, deep links and Back/Forward reopen the same record.
+  useRecordRoute({ viewMode, selectedRecord, data, loading, onOpen: handleOpenForm, onClose: handleBackToList });
 
   const breadcrumbs = [
     { label: 'CRM' },

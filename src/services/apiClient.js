@@ -1,5 +1,8 @@
 import { API_BASE_URL, API_TIMEOUT } from '../config/apiConfig';
 
+export const ACCESS_TOKEN_STORAGE_KEY = 'exobook_access_token';
+export const UNAUTHORIZED_EVENT = 'exobook:unauthorized';
+
 /**
  * Normalizes FastAPI and backend error responses into a clean structured format:
  * {
@@ -78,10 +81,15 @@ class ApiClient {
       : `${this.getBaseUrl()}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
 
     const activeCompanyId = typeof window !== 'undefined' ? localStorage.getItem('exobook_active_company_id') : null;
+    // The access token is only ever sent to the ExoBook backend, never to absolute third-party URLs.
+    const isBackendCall = !endpoint.startsWith('http');
+    const accessToken =
+      isBackendCall && typeof window !== 'undefined' ? localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) : null;
     const headers = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
       ...(activeCompanyId ? { 'X-Company-Id': activeCompanyId } : {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...options.headers,
     };
 
@@ -103,6 +111,11 @@ class ApiClient {
       } else {
         const text = await response.text();
         data = text ? { rawText: text } : {};
+      }
+
+      if (response.status === 401 && accessToken && typeof window !== 'undefined') {
+        // Session expired or revoked: let AuthContext sign the user out.
+        window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
       }
 
       if (!response.ok) {

@@ -9,8 +9,6 @@ import {
   TableHead,
   TableRow,
   TableSortLabel,
-  TextField,
-  InputAdornment,
   Button,
   IconButton,
   Chip,
@@ -30,7 +28,6 @@ import {
   DialogActions,
 } from '@mui/material';
 import {
-  Search as SearchIcon,
   DeleteOutline as DeleteIcon,
   FileDownloadOutlined as ExportIcon,
   DragIndicator as DragIndicatorIcon,
@@ -44,6 +41,8 @@ import {
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import AppBreadcrumbs from './AppBreadcrumbs';
+import SearchFacets from './common/SearchFacets';
+import useFacetSearch from './common/useFacetSearch';
 import { metadataService } from '../services/metadataService';
 
 /**
@@ -102,15 +101,33 @@ export default function DynamicListView({
   // ---------------------------------------------------------
   // State: Search, Sort, Pagination
   // ---------------------------------------------------------
-  const [searchTerm, setSearchTerm] = useState('');
+  // Search, sorting and pagination are remembered per list for the browser session, so going
+  // into a record (or refreshing) and coming back restores the list as the user left it.
+  const listStateKey = `exobook_list_${effectiveModelKey}`;
+  const [savedListState] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(listStateKey)) || {};
+    } catch {
+      return {};
+    }
+  });
   const [orderBy, setOrderBy] = useState(
-    config.draggableRows
+    savedListState.orderBy ??
+    (config.draggableRows
       ? config.defaultOrderBy || 'sequence'
-      : initialConfigColumns[0]?.field || 'id'
+      : initialConfigColumns[0]?.field || 'id')
   );
-  const [order, setOrder] = useState('asc');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(config.draggableRows ? 50 : 10);
+  const [order, setOrder] = useState(savedListState.order ?? 'asc');
+  const [page, setPage] = useState(savedListState.page ?? 0);
+  const [rowsPerPage, setRowsPerPage] = useState(savedListState.rowsPerPage ?? (config.draggableRows ? 50 : 10));
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(listStateKey, JSON.stringify({ orderBy, order, page, rowsPerPage }));
+    } catch {
+      // storage unavailable: the list simply starts fresh next time
+    }
+  }, [listStateKey, orderBy, order, page, rowsPerPage]);
 
   // ---------------------------------------------------------
   // State: Row Selection & Bulk Actions
@@ -159,7 +176,7 @@ export default function DynamicListView({
             setMetadataFields(meta.fields);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
     return () => {
       isMounted = false;
@@ -370,18 +387,8 @@ export default function DynamicListView({
     setOrderBy(field);
   };
 
-  const filteredData = useMemo(() => {
-    if (!searchTerm.trim()) return data;
-    const term = searchTerm.toLowerCase();
-
-    return data.filter((row) =>
-      activeColumns.some((col) => {
-        const val = row[col.field];
-        if (val === null || val === undefined) return false;
-        return String(val).toLowerCase().includes(term);
-      })
-    );
-  }, [data, searchTerm, activeColumns]);
+  // Odoo-style field search (fields from the model registry); a new search starts on page 1.
+  const { filteredData, searchProps } = useFacetSearch({ config, data, onFacetsChange: () => setPage(0) });
 
   const sortedData = useMemo(() => {
     return [...filteredData].sort((a, b) => {
@@ -719,7 +726,8 @@ export default function DynamicListView({
                 },
               }}
             >
-              {createButtonText === 'New Record' ? 'New' : createButtonText}
+              {'New'}
+              {/* {createButtonText === 'New Record' ? 'New' : createButtonText} */}
             </Button>
           )}
 
@@ -756,28 +764,7 @@ export default function DynamicListView({
             width: { xs: '100%', md: 'auto' },
           }}
         >
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="Search records..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon sx={{ color: '#94A3B8', fontSize: 16 }} />
-                </InputAdornment>
-              ),
-              sx: {
-                bgcolor: '#FFFFFF',
-                borderRadius: '6px',
-                height: 30,
-                fontSize: '0.6875rem',
-                border: '1px solid #E2E8F0',
-                '& fieldset': { border: 'none' },
-              },
-            }}
-          />
+          <SearchFacets {...searchProps} placeholder="Search..." />
         </Box>
 
         {/* Right Side: Modern Compact Pagination Bar, ViewSwitcher, and Export */}
@@ -1407,16 +1394,16 @@ export default function DynamicListView({
           {confirmDialog.type === 'delete'
             ? 'Confirm Bulk Deletion'
             : confirmDialog.type === 'archive'
-            ? 'Confirm Bulk Archive'
-            : 'Confirm Bulk Duplicate'}
+              ? 'Confirm Bulk Archive'
+              : 'Confirm Bulk Duplicate'}
         </DialogTitle>
         <DialogContent sx={{ pb: 1.5 }}>
           <DialogContentText sx={{ fontSize: '0.75rem', color: '#475569' }}>
             {confirmDialog.type === 'delete'
               ? `Are you sure you want to permanently delete the ${confirmDialog.count} selected record(s)? This action cannot be undone.`
               : confirmDialog.type === 'archive'
-              ? `Are you sure you want to archive the ${confirmDialog.count} selected record(s)? They will be marked as inactive.`
-              : `Create duplicate copies of the ${confirmDialog.count} selected record(s)?`}
+                ? `Are you sure you want to archive the ${confirmDialog.count} selected record(s)? They will be marked as inactive.`
+                : `Create duplicate copies of the ${confirmDialog.count} selected record(s)?`}
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 1.5 }}>
@@ -1444,8 +1431,8 @@ export default function DynamicListView({
             {confirmDialog.type === 'delete'
               ? 'Delete Records'
               : confirmDialog.type === 'archive'
-              ? 'Archive Records'
-              : 'Duplicate Records'}
+                ? 'Archive Records'
+                : 'Duplicate Records'}
           </Button>
         </DialogActions>
       </Dialog>

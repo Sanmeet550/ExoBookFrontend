@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import useRecordRoute from '../../../navigation/useRecordRoute';
+import { MESSAGES, savedRecordOf, useNotify } from '../../../context/NotificationContext';
 import { DynamicListView, DynamicFormView } from '../../common';
 import { stateService } from '../../../services/resources/stateService';
 import { MODEL_METADATA } from '../../../config/modelMetadata';
@@ -35,6 +37,7 @@ export default function State() {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const notify = useNotify();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -81,14 +84,19 @@ export default function State() {
       country_id: Number(formData.country_id),
     };
 
+    let savedRecord = null;
     try {
       if (isExisting) {
-        await stateService.update(selectedRecord[pKey], payload);
+        savedRecord = await stateService.update(selectedRecord[pKey], payload);
       } else {
-        await stateService.create(payload);
+        savedRecord = await stateService.create(payload);
       }
       await loadData();
-      handleBackToList();
+      notify.success(isExisting ? MESSAGES.updated : MESSAGES.created);
+      // Stay on the form: a created record continues as an existing one (its id goes into the URL).
+      const nextRecord = savedRecordOf(savedRecord, payload, selectedRecord);
+      if (nextRecord) setSelectedRecord(nextRecord);
+      else handleBackToList();
     } catch (err) {
       setFormError(err.message || 'Failed to save state record.');
       if (err.fieldErrors) {
@@ -103,11 +111,15 @@ export default function State() {
     if (!window.confirm('Are you sure you want to delete this state/province?')) return;
     try {
       await stateService.delete(id);
+      notify.success(MESSAGES.deleted);
       setData((prev) => prev.filter((item) => item[stateConfig.primaryKey] !== id));
     } catch (err) {
       setListError(err.message || 'Failed to delete state.');
     }
   };
+
+  // URL <-> screen sync: refresh, deep links and Back/Forward reopen the same record.
+  useRecordRoute({ viewMode, selectedRecord, data, loading, onOpen: handleOpenForm, onClose: handleBackToList });
 
   const breadcrumbs = [
     { label: 'Master' },

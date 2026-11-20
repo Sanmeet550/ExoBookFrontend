@@ -28,6 +28,8 @@ import {
 } from '@mui/icons-material';
 import AppBreadcrumbs from '../AppBreadcrumbs';
 import FormViewToolbar from '../common/FormViewToolbar';
+import Chatter from '../common/Chatter';
+import useUnsavedWarning from '../../navigation/useUnsavedWarning';
 import { contactService } from '../../services/resources/contactService';
 import { currencyService } from '../../services/resources/currencyService';
 import { companyService } from '../../services/resources/companyService';
@@ -75,6 +77,7 @@ export default function SaleOrderFormView({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
+  useUnsavedWarning(isDirty);
   const initialHeaderRef = useRef({});
   const initialLinesRef = useRef([]);
 
@@ -657,6 +660,8 @@ export default function SaleOrderFormView({
           </Button>
         </Box>
       </Card>
+
+      <Chatter model="sales_order" recordId={isEditMode ? initialData.id : null} refreshKey={initialData} />
     </Box>
   );
 }

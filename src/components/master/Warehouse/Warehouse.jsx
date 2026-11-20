@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import useRecordRoute from '../../../navigation/useRecordRoute';
+import { MESSAGES, savedRecordOf, useNotify } from '../../../context/NotificationContext';
 import { DynamicListView, DynamicFormView } from '../../common';
 import { warehouseService } from '../../../services/resources/warehouseService';
 import { MODEL_METADATA } from '../../../config/modelMetadata';
@@ -34,6 +36,7 @@ export default function Warehouse() {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const notify = useNotify();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -80,14 +83,19 @@ export default function Warehouse() {
       company_id: formData.company_id ? Number(formData.company_id) : undefined,
     };
 
+    let savedRecord = null;
     try {
       if (isExisting) {
-        await warehouseService.update(selectedRecord[pKey], payload);
+        savedRecord = await warehouseService.update(selectedRecord[pKey], payload);
       } else {
-        await warehouseService.create(payload);
+        savedRecord = await warehouseService.create(payload);
       }
       await loadData();
-      handleBackToList();
+      notify.success(isExisting ? MESSAGES.updated : MESSAGES.created);
+      // Stay on the form: a created record continues as an existing one (its id goes into the URL).
+      const nextRecord = savedRecordOf(savedRecord, payload, selectedRecord);
+      if (nextRecord) setSelectedRecord(nextRecord);
+      else handleBackToList();
     } catch (err) {
       setFormError(err.message || 'Failed to save warehouse record.');
       if (err.fieldErrors) {
@@ -102,11 +110,15 @@ export default function Warehouse() {
     if (!window.confirm('Are you sure you want to delete this warehouse?')) return;
     try {
       await warehouseService.delete(id);
+      notify.success(MESSAGES.deleted);
       setData((prev) => prev.filter((item) => item[warehouseConfig.primaryKey] !== id));
     } catch (err) {
       setListError(err.message || 'Failed to delete warehouse.');
     }
   };
+
+  // URL <-> screen sync: refresh, deep links and Back/Forward reopen the same record.
+  useRecordRoute({ viewMode, selectedRecord, data, loading, onOpen: handleOpenForm, onClose: handleBackToList });
 
   const breadcrumbs = [
     { label: 'Master' },

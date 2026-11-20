@@ -11,6 +11,9 @@ import {
 } from '@mui/material';
 import FormField from './common/FormField';
 import FormViewToolbar from './common/FormViewToolbar';
+import Chatter from './common/Chatter';
+import { toChatterModel } from '../services/chatterService';
+import useUnsavedWarning from '../navigation/useUnsavedWarning';
 import { metadataService } from '../services/metadataService';
 import { useCompany } from '../context/CompanyContext';
 
@@ -58,6 +61,15 @@ export default function DynamicFormView({
   const [formData, setFormData] = useState({});
   const [isDirty, setIsDirty] = useState(false);
   const initialValuesRef = useRef({});
+  useUnsavedWarning(isDirty);
+
+  // Chatter: reload the timeline each time a save finishes (field changes are logged on save).
+  const [savedCount, setSavedCount] = useState(0);
+  const wasSaving = useRef(false);
+  useEffect(() => {
+    if (wasSaving.current && !loading) setSavedCount((count) => count + 1);
+    wasSaving.current = loading;
+  }, [loading]);
 
   // Record Navigation Indices
   const currentIndex = isEditMode && records.length > 0
@@ -140,9 +152,10 @@ export default function DynamicFormView({
 
   const handleSubmit = (e) => {
     if (e) e.preventDefault();
+    // The form only becomes "clean" when the save succeeds: the parent then passes the saved
+    // record as initialData, which resets the form below. A failed save stays dirty, so the
+    // user can correct it and save again.
     onSave?.(formData);
-    initialValuesRef.current = { ...formData };
-    setIsDirty(false);
   };
 
   const handleDiscard = () => {
@@ -271,6 +284,15 @@ export default function DynamicFormView({
           </Button>
         </Box>
       </Card>
+
+      {/* Communication timeline and field-change history (existing records only) */}
+      {isEditMode && (
+        <Chatter
+          model={config.chatterModel || toChatterModel(model)}
+          recordId={initialData[primaryKey]}
+          refreshKey={savedCount}
+        />
+      )}
     </Box>
   );
 }

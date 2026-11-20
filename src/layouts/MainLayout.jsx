@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Box, CssBaseline, ThemeProvider } from '@mui/material';
+import { Box } from '@mui/material';
 import Header from './Header';
 import Sidebar, { SIDEBAR_EXPANDED_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './Sidebar';
 import { menuConfig } from '../config/menuConfig';
-import { theme } from '../theme';
 import { CompanyProvider } from '../context/CompanyContext';
+import { navigate } from '../navigation/router';
+import { menuPath } from '../navigation/appRoutes';
 
 /**
  * CRM top-nav configuration
@@ -28,61 +29,43 @@ const CRM_TOP_NAV_DROPDOWNS = [
   },
 ];
 
-export default function MainLayout({ activeView, setActiveView, onNavigateModule, children }) {
+export default function MainLayout({ activeView, moduleTopNav = null, children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeMenuId, setActiveMenuId] = useState(activeView?.menuId || 'sale-order');
-  const [activeSubmenuId, setActiveSubmenuId] = useState(
-    activeView?.menuId === 'master' ? activeView?.moduleKey : null
-  );
   const [expandedMenus, setExpandedMenus] = useState({ master: true });
 
-  // CRM sub-navigation state (Lead / Opportunity / Lead Status)
-  const [crmActiveTab, setCrmActiveTab] = useState('lead');
+  // The active menu, submenu and top-nav tab all come from the URL (see navigation/appRoutes.js).
+  const activeMenu = menuConfig.find((item) => item.id === activeView.menuId);
+  const activeMenuId = activeView.menuId;
+  const activeSubmenuId = activeView.subId;
+  const activeTab = activeView.tab;
+  const changeTab = (tabId) => navigate(menuPath(activeMenu, tabId));
 
-  const isCrmActive = activeView?.moduleKey === 'crm';
+  // CRM's tabs are static; other modules (Helpdesk) hand in their own, e.g. role-dependent, tabs.
+  const topNav = activeView.moduleKey === 'crm'
+    ? { tabs: CRM_TOP_NAV_TABS, dropdowns: CRM_TOP_NAV_DROPDOWNS }
+    : moduleTopNav;
 
   const handleToggleMenu = (menuItem) => {
-    setActiveMenuId(menuItem.id);
-
     if (!menuItem.hasSubmenu) {
-      setActiveSubmenuId(null);
-      if (onNavigateModule) {
-        onNavigateModule(menuItem.viewKey, menuItem.label, menuItem.label, menuItem.id);
-      }
-      // Reset CRM tab to Lead when re-entering CRM
-      if (menuItem.id === 'crm') {
-        setCrmActiveTab('lead');
-      }
-    } else {
-      if (!isSidebarOpen) {
-        setIsSidebarOpen(true);
-      }
-      setExpandedMenus((prev) => ({
-        ...prev,
-        [menuItem.id]: !prev[menuItem.id],
-      }));
+      // Re-entering a module with tabs opens its default tab.
+      navigate(menuPath(menuItem));
+      return;
     }
+    if (!isSidebarOpen) {
+      setIsSidebarOpen(true);
+    }
+    setExpandedMenus((prev) => ({ ...prev, [menuItem.id]: !prev[menuItem.id] }));
   };
 
   const handleSelectSubmenu = (parentMenu, submenuItem) => {
-    setActiveMenuId(parentMenu.id);
-    setActiveSubmenuId(submenuItem.id);
-    if (onNavigateModule) {
-      onNavigateModule(submenuItem.moduleKey, submenuItem.label, parentMenu.label, parentMenu.id);
-    }
-  };
-
-  const handleCrmTabChange = (tabId) => {
-    setCrmActiveTab(tabId);
+    navigate(menuPath(parentMenu, submenuItem.id));
   };
 
   const currentSidebarWidth = isSidebarOpen ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
 
   return (
-    <ThemeProvider theme={theme}>
-      <CompanyProvider>
+    <CompanyProvider>
         <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%', bgcolor: 'background.default', overflowX: 'hidden' }}>
-          <CssBaseline />
 
           <Sidebar
             menuConfig={menuConfig}
@@ -111,25 +94,17 @@ export default function MainLayout({ activeView, setActiveView, onNavigateModule
               isSidebarOpen={isSidebarOpen}
               onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
               // CRM top-nav: pass tabs and dropdowns when CRM is active
-              topNavTabs={isCrmActive ? CRM_TOP_NAV_TABS : null}
-              activeTopNavTab={isCrmActive ? crmActiveTab : null}
-              onTopNavTabChange={isCrmActive ? handleCrmTabChange : null}
-              topNavDropdowns={isCrmActive ? CRM_TOP_NAV_DROPDOWNS : null}
+              topNavTabs={topNav ? topNav.tabs : null}
+              activeTopNavTab={topNav ? activeTab : null}
+              onTopNavTabChange={topNav ? changeTab : null}
+              topNavDropdowns={topNav ? topNav.dropdowns : null}
             />
 
             <Box sx={{ p: 1.5, flexGrow: 1, minWidth: 0 }}>
-              {/* Inject crmActiveTab into CRM children */}
-              {isCrmActive
-                ? React.Children.map(children, (child) =>
-                    React.isValidElement(child)
-                      ? React.cloneElement(child, { crmActiveTab })
-                      : child
-                  )
-                : children}
+              {children}
             </Box>
           </Box>
         </Box>
-      </CompanyProvider>
-    </ThemeProvider>
+    </CompanyProvider>
   );
 }

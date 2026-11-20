@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAuth } from '../context/AuthContext';
 import {
   AppBar,
   Toolbar,
@@ -20,6 +21,7 @@ import {
   HelpOutline as HelpIcon,
   SettingsOutlined,
   ExpandMore as ExpandMoreIcon,
+  Logout,
 } from '@mui/icons-material';
 import CompanySwitcher from '../components/CompanySwitcher';
 
@@ -39,6 +41,9 @@ export default function Header({
   topNavDropdowns = null,
 }) {
   const [settingsAnchor, setSettingsAnchor] = React.useState(null);
+  const [userMenuAnchor, setUserMenuAnchor] = React.useState(null);
+  const { user, logout } = useAuth();
+  const userInitials = (user?.name || '?').split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
   const [openDropdownId, setOpenDropdownId] = React.useState(null);
 
   const handleDropdownClick = (dropdownId, event) => {
@@ -251,6 +256,7 @@ export default function Header({
           </Tooltip>
 
           <Box
+            onClick={(e) => setUserMenuAnchor(e.currentTarget)}
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -262,7 +268,7 @@ export default function Header({
             }}
           >
             <Avatar
-              alt="Admin"
+              alt={user?.name || 'User'}
               sx={{
                 width: 24,
                 height: 24,
@@ -272,17 +278,34 @@ export default function Header({
                 fontWeight: 700,
               }}
             >
-              EX
+              {userInitials}
             </Avatar>
             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
               <Typography sx={{ fontWeight: 600, color: '#0F172A', fontSize: '0.6875rem', lineHeight: 1.1 }}>
-                Admin User
+                {user?.name}
               </Typography>
               <Typography sx={{ color: '#64748B', fontSize: '0.58rem' }}>
-                Enterprise
+                {user?.login}
               </Typography>
             </Box>
           </Box>
+          <Menu
+            anchorEl={userMenuAnchor}
+            open={Boolean(userMenuAnchor)}
+            onClose={() => setUserMenuAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          >
+            <MenuItem
+              onClick={() => {
+                setUserMenuAnchor(null);
+                logout();
+              }}
+              sx={{ fontSize: '0.75rem', gap: 1 }}
+            >
+              <Logout sx={{ fontSize: 16 }} /> Sign out
+            </MenuItem>
+          </Menu>
         </Box>
       </Toolbar>
     </AppBar>

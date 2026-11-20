@@ -5,6 +5,9 @@ import AppBreadcrumbs from '../AppBreadcrumbs';
 import FormField from './FormField';
 import ViewSwitcher from './ViewSwitcher';
 import FormViewToolbar from './FormViewToolbar';
+import Chatter from './Chatter';
+import SearchFacets from './SearchFacets';
+import useFacetSearch from './useFacetSearch';
 import { DynamicKanbanView, KanbanColumn, KanbanCard } from '../kanban';
 
 export {
@@ -18,5 +21,8 @@ export {
   FormField,
   ViewSwitcher,
   FormViewToolbar,
+  Chatter,
+  SearchFacets,
+  useFacetSearch,
 };
 export default DynamicListView;

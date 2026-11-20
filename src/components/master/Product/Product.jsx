@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import useRecordRoute from '../../../navigation/useRecordRoute';
+import { MESSAGES, savedRecordOf, useNotify } from '../../../context/NotificationContext';
 import { UniversalDataView, DynamicFormView } from '../../common';
 import { productService } from '../../../services/resources/productService';
 import { MODEL_METADATA } from '../../../config/modelMetadata';
@@ -44,6 +46,7 @@ export default function Product() {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const notify = useNotify();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -97,14 +100,19 @@ export default function Product() {
       purchase_description: formData.purchase_description || '',
     };
 
+    let savedRecord = null;
     try {
       if (isExisting) {
-        await productService.update(selectedRecord[pKey], payload);
+        savedRecord = await productService.update(selectedRecord[pKey], payload);
       } else {
-        await productService.create(payload);
+        savedRecord = await productService.create(payload);
       }
       await loadData();
-      handleBackToList();
+      notify.success(isExisting ? MESSAGES.updated : MESSAGES.created);
+      // Stay on the form: a created record continues as an existing one (its id goes into the URL).
+      const nextRecord = savedRecordOf(savedRecord, payload, selectedRecord);
+      if (nextRecord) setSelectedRecord(nextRecord);
+      else handleBackToList();
     } catch (err) {
       setFormError(err.message || 'Failed to save product record.');
       if (err.fieldErrors) {
@@ -119,11 +127,15 @@ export default function Product() {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
     try {
       await productService.delete(id);
+      notify.success(MESSAGES.deleted);
       setData((prev) => prev.filter((item) => item[productConfig.primaryKey] !== id));
     } catch (err) {
       setListError(err.message || 'Failed to delete product.');
     }
   };
+
+  // URL <-> screen sync: refresh, deep links and Back/Forward reopen the same record.
+  useRecordRoute({ viewMode, selectedRecord, data, loading, onOpen: handleOpenForm, onClose: handleBackToList });
 
   const breadcrumbs = [
     { label: 'Master' },

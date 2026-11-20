@@ -16,6 +16,7 @@ import {
   MonetizationOnOutlined,
   FolderSpecialOutlined,
   TrendingUpOutlined,
+  SupportAgentOutlined,
   ExpandLess,
   ExpandMore,
   FiberManualRecord,
@@ -26,6 +27,7 @@ const iconMap = {
   MonetizationOnOutlined: <MonetizationOnOutlined sx={{ fontSize: 18 }} />,
   FolderSpecialOutlined: <FolderSpecialOutlined sx={{ fontSize: 18 }} />,
   TrendingUpOutlined: <TrendingUpOutlined sx={{ fontSize: 18 }} />,
+  SupportAgentOutlined: <SupportAgentOutlined sx={{ fontSize: 18 }} />,
 };
 
 export const SIDEBAR_EXPANDED_WIDTH = 220;
