@@ -1,0 +1,91 @@
+:root {
+  /* Brand colors */
+  --color-primary: #262755;
+  --color-primary-light: #37397b;
+  --color-primary-dark: #1b1c3d;
+  --color-primary-subtle: rgba(38, 39, 85, 0.08);
+
+  --color-secondary: #fdd53d;
+  --color-secondary-hover: #e6be27;
+  --color-secondary-subtle: rgba(253, 213, 61, 0.15);
+
+  /* Backgrounds & surfaces */
+  --bg-app: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --bg-hover: #f8fafc;
+  --bg-selected: rgba(38, 39, 85, 0.06);
+
+  /* Text & icons */
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --text-inverse: #ffffff;
+
+  /* Borders & dividers */
+  --border-color: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --border-focus: #262755;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+
+  /* Spacing system (compact SaaS) */
+  --space-2xs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+
+  /* Radius */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+
+  /* Typography scale (~50% compact enterprise sizing) */
+  --font-2xs: 0.5625rem; /* ~9px */
+  --font-xs: 0.625rem;   /* 10px */
+  --font-sm: 0.6875rem;  /* 11px */
+  --font-base: 0.75rem;  /* 12px (standard body) */
+  --font-md: 0.8125rem;  /* 13px */
+  --font-lg: 0.9375rem;  /* 15px (h6 / card title) */
+  --font-xl: 1.0625rem;  /* 17px (page title) */
+
+  /* Sidebar */
+  --sidebar-expanded-width: 220px;
+  --sidebar-collapsed-width: 64px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: var(--font-base);
+  color: var(--text-primary);
+  background-color: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom compact scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+

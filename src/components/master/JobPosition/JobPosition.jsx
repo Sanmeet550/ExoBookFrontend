@@ -1,0 +1,152 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { DynamicListView, DynamicFormView } from '../../common';
+import { jobPositionService } from '../../../services/resources/jobPositionService';
+import { MODEL_METADATA } from '../../../config/modelMetadata';
+
+/**
+ * JobPosition Master Component
+ * 
+ * Configured with dynamic model metadata:
+ * - Foreign Keys (many2one): company_id, department_id (cascading dependency on company_id)
+ * - Endpoints: GET /job_position/view/all, POST /job_position/create, PATCH /job_position/update/{id}, DELETE /job_position/delete/{id}
+ */
+export const jobPositionConfig = {
+  title: 'Job Positions',
+  primaryKey: 'id',
+  createButtonText: 'New Job Position',
+  model: 'jobPosition',
+  columns: [
+    { field: 'id', headerName: 'ID', width: 80, sortable: true },
+    { field: 'name', headerName: 'Job Title / Position', flex: 1, sortable: true },
+    { field: 'department_id', headerName: 'Department ID', width: 140 },
+    { field: 'company_id', headerName: 'Company ID', width: 130 },
+  ],
+  formFields: MODEL_METADATA.jobPosition.fields,
+};
+
+export default function JobPosition() {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState(null);
+
+  const [viewMode, setViewMode] = useState('list');
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setListError(null);
+    try {
+      const records = await jobPositionService.getAll();
+      setData(Array.isArray(records) ? records : []);
+    } catch (err) {
+      setListError(err.message || 'Failed to load job positions.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleOpenForm = (record = null) => {
+    setSelectedRecord(record);
+    setFormError(null);
+    setFieldErrors({});
+    setViewMode('form');
+  };
+
+  const handleBackToList = () => {
+    setSelectedRecord(null);
+    setFormError(null);
+    setFieldErrors({});
+    setViewMode('list');
+  };
+
+  const handleSave = async (formData) => {
+    setFormLoading(true);
+    setFormError(null);
+    setFieldErrors({});
+
+    const pKey = jobPositionConfig.primaryKey;
+    const isExisting = Boolean(selectedRecord && selectedRecord[pKey]);
+
+    const payload = {
+      name: formData.name?.trim(),
+      company_id: Number(formData.company_id),
+      department_id: Number(formData.department_id),
+    };
+
+    try {
+      if (isExisting) {
+        await jobPositionService.update(selectedRecord[pKey], payload);
+      } else {
+        await jobPositionService.create(payload);
+      }
+      await loadData();
+      handleBackToList();
+    } catch (err) {
+      setFormError(err.message || 'Failed to save job position.');
+      if (err.fieldErrors) {
+        setFieldErrors(err.fieldErrors);
+      }
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this job position?')) return;
+    try {
+      await jobPositionService.delete(id);
+      setData((prev) => prev.filter((item) => item[jobPositionConfig.primaryKey] !== id));
+    } catch (err) {
+      setListError(err.message || 'Failed to delete job position.');
+    }
+  };
+
+  const breadcrumbs = [
+    { label: 'Master' },
+    { label: 'Job Position', onClick: viewMode === 'form' ? handleBackToList : undefined },
+  ];
+  if (viewMode === 'form') {
+    breadcrumbs.push({
+      label: selectedRecord ? (selectedRecord.name || `Position #${selectedRecord[jobPositionConfig.primaryKey]}`) : 'New Job Position',
+    });
+  }
+
+  if (viewMode === 'form') {
+    return (
+      <DynamicFormView
+        config={jobPositionConfig}
+        initialData={selectedRecord}
+        records={data}
+        onNavigateRecord={(rec) => handleOpenForm(rec)}
+        onNew={() => handleOpenForm(null)}
+        loading={formLoading}
+        error={formError}
+        fieldErrors={fieldErrors}
+        onSave={handleSave}
+        onBack={handleBackToList}
+        breadcrumbs={breadcrumbs}
+      />
+    );
+  }
+
+  return (
+    <DynamicListView
+      config={jobPositionConfig}
+      data={data}
+      loading={loading}
+      error={listError}
+      onRowClick={(rec) => handleOpenForm(rec)}
+      onCreateClick={() => handleOpenForm(null)}
+      onDeleteClick={handleDelete}
+      breadcrumbs={breadcrumbs}
+    />
+  );
+}
+
